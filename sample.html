@@ -1,0 +1,259 @@
+<dom-module id="main-app">
+<template>
+	<style is='custom-style'>
+		:host {
+			display: block;
+			height: 100%;
+		}
+		neon-animated-pages {
+		   	height: 100%;
+		}
+		neon-animated-pages > *{
+		}
+
+		neon-animatable {
+		}
+		.overlay {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			background: #FFF;
+			z-index: 9999999;
+		}
+		.hidden {
+			display: none;
+		}
+		.login-container{
+			height: 100vh;
+			background-color: var(--paper-blue-700);
+		}
+		.login-btn-container{
+			padding: 80px 30px; 
+			color: white;
+			font-family: 'roboto';
+			text-align: center;
+			background-color: rgba(0,0,0,.1);
+		}
+		.login-btn{
+			text-transform: none;
+			background-color: #E13718;
+			padding: 5px 30px;
+		}
+		.login-btn paper-icon-button{
+			padding: 0px;
+			height: 24px;
+			width: 24px;
+			margin-right: 5px;
+		}
+	</style>
+	<!-- <app-localstorage-document key="categories" data="{{all_categories}}"></app-localstorage-document> -->
+	<app-localstorage-document key="project_user_location" data="{{project_user_location}}"></app-localstorage-document>
+	<app-localstorage-document key="sort_options" data="{{sort_options}}"></app-localstorage-document>
+	<iron-ajax
+	  url="../../demo-data/categories.json"
+	  handle-as="json"
+	  debounce-duration="300"
+	  id="categoriesFetcher"
+	  on-response="_handleCategories"></iron-ajax>
+
+	<firebase-app auth-domain="xxxxx.firebaseapp.com"
+		database-url="https://xxxxx.firebaseio.com"
+		api-key="xxxxxxxxxxxxxx">
+	</firebase-app>
+	<firebase-auth id="auth" user="{{project_user}}" provider="google" on-error="handleError">
+	</firebase-auth>
+
+	<geo-location id="geolocation" coords="{{coords}}" on-geolocation-success="geolocationDataUpdated"></geo-location>
+
+	<template is="dom-if" if="[[!project_user]]">
+		<div class="layout vertical center-center login-container">
+			<div class="login-btn-container">
+				<h1>Welcome To project</h1>
+				<paper-button raised on-tap="login" class="login-btn"> 
+					<paper-icon-button src="/images/social-icons/googleplus.png" disabled></paper-icon-button>
+					Login with google
+				</paper-button>
+			</div>
+		</div>
+	</template>
+
+	<app-location route="{{route}}" use-hash-as-path></app-location>
+	<app-route route="{{route}}" pattern="/:page" data="{{pageData}}" tail="{{pageRouteTail}}"></app-route>
+	<template is="dom-if" if="[[project_user]]">
+		<neon-animated-pages selected='{{pageData.page}}' attr-for-selected='key' class='flex'>
+			<template is="dom-if" if="{{_isExpPageActive(pageData.page)}}">
+				<exp-elt categories="{{categories}}" all_categories="[[all_categories]]" categories_icons="[[categories_icons]]"
+				key='home' route="{{pageRouteTail}}"
+				sort_options="{{sort_options}}"
+				reward_zone_selection="{{reward_zone_selection}}"
+				nearme_selection="{{nearme_selection}}"
+				page="{{pageData.page}}" loading={{isLoading}}></exp-elt>
+			</template>
+			<template is="dom-if" if="{{_isCatPageActive(pageData.page)}}" restamp="true">
+				<all-categories categories_icons="[[categories_icons]]"
+				all_categories="[[all_categories]]" subpage="[[subroute]]"
+				nearme_selection="{{nearme_selection}}"
+				reward_zone_selection="{{reward_zone_selection}}" sort_options="{{sort_options}}"
+				categories="{{categories}}" key='categories' loading="{{isLoading}}"></all-categories>
+			</template>
+
+			<template is="dom-if" if="{{_isDetailPageActive(pageData.page)}}" restamp="true">
+				<card-detail-page key='cards' route="{{pageRouteTail}}" loading={{isLoading}}></card-detail-page>
+			</template>
+
+			<template is="dom-if" if="{{isPageActive(pageData.page, 'reward-info')}}" restamp="true">
+				<reward-info key='reward-info' route="{{pageRouteTail}}" loading={{isLoading}}></reward-info>
+			</template>
+
+			<template is="dom-if" if="{{isPageActive(pageData.page, 'business')}}">
+				<business-location key='business' route="{{pageRouteTail}}" loading={{isLoading}}></business-location>
+			</template>
+
+		</neon-animated-pages>
+		<iron-signals on-iron-signal-subroute_change="_subrouteUpdated"></iron-signals>
+	</template>
+	<div class$="overlay {{isHidden(isLoading)}}">
+		<paper-spinner active="[[isLoading]]"></paper-spinner>
+	</div>
+</template>
+	<script>
+		Polymer({
+			is: 'main-app',
+			isHidden: function (isLoading){
+				return isLoading?'':'hidden';
+			},
+			properties:{
+
+				isLoading: {
+					type: Boolean,
+					value: true
+				},
+				categories_icons:{
+					type:Object,
+					value:{
+						"all":"icons:star",
+						"food and drink":"maps:local-bar",
+						"services":"icons:settings",
+						"events and classes":"communication:business",
+						"food":"maps:local-dining",
+						"home and decor":"icons:store",
+						"entertainment":"icons:theaters",
+						"fashion":"icons:assignment-ind",
+						"beauty and spa":"places:hot-tub",
+						"grocery":"maps:local-grocery-store",
+						"goods":"icons:view-carousel",
+						"family":"social:people",
+						"gifts and shopping":"icons:card-giftcard",
+						"shopping":"icons:card-giftcard",
+						"pets":"icons:pets",
+						"health and wellness":"icons:favorite",
+						"classes":"communication:business",
+						"others":"icons:dns",
+						"activities":"icons:extension",
+						"electronic":"icons:lightbulb-outline",
+						"retail":"hardware:device-hub",
+						"Aquarium":"hardware:device-hub"
+					}
+				},
+				all_categories:{
+					type:Object
+				},
+				categories:{
+					type:Object
+				},
+				reward_zone_selection:{
+					type:String,
+					value:'reward' /* expected values are reward / reward_giftcards / reward_campaigns */
+				},
+				nearme_selection:{
+					type:String,
+					value:'nearme' /* expected values are nearme / nearme_attractions / nearme_restaurant / nearme_nightlife / nearme_shops / nearme_travel / nearme_services */
+				},
+				sort_options:{
+					type:Object,
+					value:{
+						sort:'relevance', //data will be sorted by relevance default
+						filter:{}
+					},
+				},
+				subroute:{
+					type:String
+				},
+				project_user:{
+					type: Object
+				},
+				project_user_location:{
+					type: Object
+				}
+			},
+			observers:[
+				"_routeChanged(pageData.*)",
+			],
+			_routeChanged: function (pageData, oldData){
+				var loaderNotNeededInThese = ['home','categories', 'business'];
+				if( loaderNotNeededInThese.indexOf(pageData.value.page) < 0){
+					this.isLoading = true;
+				}
+				this.fire('iron-signal', {name: 'route', data: null});
+			},
+			attached: function() {
+				var self = this;
+				setTimeout(function (){
+					if (!self.route.path) {
+						self.set('route.path', '/home/campaigns');
+					}
+				});
+				this.$.categoriesFetcher.generateRequest();
+
+				this.async(function (){
+
+					if(!this.project_user) this.set('isLoading', false);
+
+					if(!this.project_user_location)
+						this.$.geolocation.getLocation();
+				},1000);
+			},
+			ready: function (){
+	  		},
+			_isExpPageActive: function(page){
+				if(page=='home')return true;
+				else return false;
+			},
+			_isCatPageActive: function(page){
+				if(page=='categories')return true;
+				else return false;
+			},
+			_isDetailPageActive: function(page){
+				if(page=='cards')return true;
+				else return false;
+			},
+			isPageActive: function (page, name){
+				return page == name;
+			},
+			_handleCategories: function (data){
+				var response = data.detail.response;
+				this.set('all_categories', response);
+			},
+			_subrouteUpdated: function (e, data){
+				this.set('subroute',data);
+			},
+			login: function (e){
+				this.$.auth.signInWithPopup().then(function(response) { // successful authentication response here
+			    }).catch(function(error) { // unsuccessful authentication response here
+			    });
+			},
+			handleError: function (e){
+				alert('Network Error! Please refresh and retry');
+			},
+			geolocationDataUpdated: function (){
+				this.set('project_user_location', this.coords);
+			}
+		});
+	</script>
+</dom-module>
